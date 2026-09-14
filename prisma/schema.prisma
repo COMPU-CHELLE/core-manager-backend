@@ -1,0 +1,399 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "queryCompiler"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Plan {
+  id        Int       @id @default(autoincrement())
+  name      String
+  price     Float
+  maxUsers  Int
+  maxAssets Int
+  createdAt DateTime  @default(now())
+  companies Company[]
+}
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  nit       String?  @unique
+  logo      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  planId Int
+  plan   Plan @relation(fields: [planId], references: [id])
+
+  users       User[]
+  roles       Role[]
+  branches    Branch[]
+  employees   Employee[]
+  assets      Asset[]
+  invoices    Invoice[]
+  tasks       Task[]
+  tickets     Ticket[]
+  credentials Credential[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  code     String @unique
+  name     String
+  email    String @unique
+  password String
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  companyId Int?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  branchId Int?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
+
+  messages  TicketMessage[]
+  auditLogs AuditLog[]
+
+  generatedAssignmentDocuments AssetAssignmentDocument[]
+  createdTasks  Task[] @relation("TaskCreatedBy")
+  assignedTasks Task[] @relation("TaskAssignedTo")
+
+  @@index([companyId])
+  @@index([roleId])
+  @@index([branchId])
+}
+
+model Role {
+  id   Int    @id @default(autoincrement())
+  code String
+  name String
+
+  isGlobal Boolean @default(false)
+
+  companyId Int?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([companyId])
+}
+
+model Permission {
+  id     Int    @id @default(autoincrement())
+  code   String
+  name   String
+  module String
+  action String
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+}
+
+model RolePermission {
+  id Int @id @default(autoincrement())
+
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model Branch {
+  id      Int     @id @default(autoincrement())
+  code    String
+  name    String
+  address String?
+  email   String?
+
+  deletedAt DateTime?
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  users     User[]
+  assets    Asset[]
+  invoices  Invoice[]
+  employees Employee[]
+
+  @@index([companyId])
+  @@index([deletedAt])
+}
+
+model Employee {
+  id       Int     @id @default(autoincrement())
+  name     String
+  position String?
+  email    String?
+  phone    String?
+
+  deletedAt DateTime?
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  branchId Int?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  assignments AssetAssignment[]
+
+  @@index([companyId])
+  @@index([deletedAt])
+}
+
+model Asset {
+  id           Int          @id @default(autoincrement())
+  name         String
+  type         String
+  serial       String?
+  brand        String?
+  model        String?
+  purchaseDate DateTime?
+  cost         Float?
+  detail       AssetDetail?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  branchId Int?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  assignments  AssetAssignment[]
+  maintenances Maintenance[]
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([serial])
+  @@index([deletedAt])
+}
+
+model AssetDetail {
+  id           Int    @id @default(autoincrement())
+  assetId      Int    @unique
+  ram_type     String
+  ram_capacity String
+  hdd_type     String
+  hdd_capacity String
+  pro_type     String
+  pro_detail   String
+  mbr_type     String
+  mbr_detail   String
+  gra_type     String
+  gra_detail   String
+  monitor      String
+  mon_detail   String
+  keyboard     String
+  key_detail   String
+  mouse        String
+  mou_detail   String
+
+  asset Asset @relation(fields: [assetId], references: [id])
+}
+
+model AssetAssignment {
+  id         Int       @id @default(autoincrement())
+  assetId    Int
+  employeeId Int
+  assignedAt DateTime  @default(now())
+  returnedAt DateTime?
+
+  asset    Asset    @relation(fields: [assetId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  document AssetAssignmentDocument?
+
+  @@index([assetId])
+  @@index([employeeId])
+}
+
+model AssetAssignmentDocument {
+  id             Int      @id @default(autoincrement())
+  assignmentId   Int      @unique
+  documentNumber String
+  generatedAt    DateTime @default(now())
+  generatedById  Int?
+
+  assignment  AssetAssignment @relation(fields: [assignmentId], references: [id])
+  generatedBy User?           @relation(fields: [generatedById], references: [id])
+
+  @@index([assignmentId])
+}
+
+model Maintenance {
+  id          Int      @id @default(autoincrement())
+  description String
+  cost        Float?
+  date        DateTime @default(now())
+  deletedAt   DateTime?
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@index([deletedAt])
+}
+
+model Credential {
+  id       Int     @id @default(autoincrement())
+  url     String?
+  name     String
+  username String  @db.Text
+  password String  @db.Text
+  type     String
+  notes    String?
+
+  /// Cómo debe comportarse el botón "Acceder":
+  /// - basic_auth: arma la URL con usuario:clave@host (DVR/routers)
+  /// - copy_open: copia la clave al portapapeles y abre la URL (servidores/paneles con formulario, correos)
+  /// - local_only: no hay URL que abrir; solo revelar/copiar (superusuario local del equipo)
+  accessMode String @default("copy_open")
+
+  deletedAt DateTime?
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([deletedAt])
+}
+
+model Invoice {
+  id       Int      @id @default(autoincrement())
+  number   String
+  provider String
+  date     DateTime
+  category String
+
+  companyId Int
+  branchId  Int
+
+  company Company @relation(fields: [companyId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+
+  items InvoiceItem[]
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([date])
+  @@index([deletedAt])
+}
+
+model InvoiceItem {
+  id        Int @id @default(autoincrement())
+  invoiceId Int
+
+  description String
+  quantity    Int
+  unitPrice   Float
+  tax         Float? // IVA, etc
+  total       Float // calculado al crear
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+
+  title       String
+  description String?
+
+  status      String   @default("OPEN") // OPEN | IN_PROGRESS | DONE | CANCELED
+  priority    String?  // LOW | MEDIUM | HIGH
+
+  dueDate     DateTime?
+  closedAt    DateTime?
+  solution    String?
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdById Int
+  createdBy   User @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  assignedToId Int?
+  assignedTo   User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([deletedAt])
+}
+
+model Ticket {
+  id     Int    @id @default(autoincrement())
+  title  String
+  status String
+
+  deletedAt DateTime?
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  messages TicketMessage[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model TicketMessage {
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now())
+
+  ticketId Int
+  userId   Int
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  companyId  Int?
+  action     String
+  entity     String
+  entityId   Int?
+  method     String
+  path       String
+  ip         String?
+  payload    Json?
+  beforeData Json?
+  afterData  Json?
+  statusCode Int?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+}
